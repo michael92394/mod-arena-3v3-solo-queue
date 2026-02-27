@@ -27,9 +27,9 @@
 constexpr uint32 BATTLEGROUND_QUEUE_1v1 = 11;
 
 // custom 3v3 Arena solo
-constexpr uint32 ARENA_TYPE_3v3_SOLO = 4;
-constexpr uint32 ARENA_TEAM_SOLO_3v3 = 4;
-constexpr uint32 ARENA_SLOT_SOLO_3v3 = 4;
+constexpr uint32 ARENA_TYPE_3v3_SOLO = 3; // display/packet arena type stays 3v3
+constexpr uint32 ARENA_TEAM_SOLO_3v3 = 3; // 3v3 team type
+constexpr uint32 ARENA_SLOT_SOLO_3v3 = 1; // 3v3 arena slot (0=2v2,1=3v3,2=5v5)
 constexpr uint32 BATTLEGROUND_QUEUE_3v3_SOLO = 12;
 constexpr BattlegroundQueueTypeId bgQueueTypeId = (BattlegroundQueueTypeId)((int) BATTLEGROUND_QUEUE_3v3_SOLO);
 
