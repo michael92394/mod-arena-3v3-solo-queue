@@ -843,23 +843,23 @@ bool Solo3v3::HasIgnoreConflict(Player* candidate, BattlegroundQueue* queue, uin
 
 void AddSC_Solo_3v3_Arena()
 {
-    // Register your scripts here.
-    // Most modules simply "new" the Script classes in their AddSC_ function.
-    // If your Solo3v3 is singleton-only and scripts are registered elsewhere,
-    // you can still force init by touching the singleton.
+    LOG_INFO("module", "[Solo3v3] AddSC_Solo_3v3_Arena() called - module is loading.");
+
+    // Ensure singleton exists
     Solo3v3::instance();
 
-    // If you have script classes like:
-    // new Solo3v3_BG();
-    // new Solo3v3_Queue();
-    // then instantiate them here.
+    // ACTUALLY register the scripts (these are the ones that make the queue run)
+    // If you don't have these classes anymore, remove these lines and tell me what you have instead.
+    new ConfigLoader3v3Arena();
+    new Team3v3arena();
+    new Arena_SC();
 }
 
 void AddSC_Solo_3v3_commandscript()
 {
-    // If you have a CommandScript class, instantiate it here.
+    LOG_INFO("module", "[Solo3v3] AddSC_Solo_3v3_commandscript() called.");
+
+    // If you have a command script class, instantiate it here.
     // Example:
     // new Solo3v3Commands();
-
-    // If commands are already registered elsewhere, leave empty.
 }
