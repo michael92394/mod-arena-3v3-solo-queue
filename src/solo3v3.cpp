@@ -88,7 +88,7 @@ namespace
         // Create default row
         CharacterDatabase.Execute(fmt::format(
             "INSERT INTO `{}` (guid, rating, mmr, games, wins, losses, last_update) VALUES ({}, 1500, 1500, 0, 0, 0, {})",
-            SOLO_RATING_TABLE, guidLow, (uint32)GameTime::GetGameTime()));
+            SOLO_RATING_TABLE, guidLow, static_cast<uint32>(GameTime::GetGameTime().count())));
 
         return row;
     }
@@ -100,7 +100,7 @@ namespace
         uint32 guidLow = player->GetGUID().GetCounter();
         CharacterDatabase.Execute(fmt::format(
             "UPDATE `{}` SET rating={}, mmr={}, games={}, wins={}, losses={}, last_update={} WHERE guid = {}",
-            SOLO_RATING_TABLE, row.rating, row.mmr, row.games, row.wins, row.losses, (uint32)GameTime::GetGameTime(), guidLow));
+            SOLO_RATING_TABLE, row.rating, row.mmr, row.games, row.wins, row.losses, static_cast<uint32>(GameTime::GetGameTime().count()), guidLow));
     }
 
     static float ExpectedScore(uint32 myMmr, uint32 oppMmr)
