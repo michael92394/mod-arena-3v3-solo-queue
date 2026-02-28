@@ -118,6 +118,10 @@ public:
     static Solo3v3* instance();
 
     uint32 GetAverageMMR(ArenaTeam* team);
+
+    // --- Solo rated ladder (separate from ArenaTeam) ---
+    bool GetSoloRatingAndMMR(Player* player, uint32& rating, uint32& mmr);
+    void UpdateSoloLadderAfterMatch(Player* player, bool isWin, bool isDraw, uint32 myTeamMMR, uint32 oppTeamMMR);
     void CheckStartSolo3v3Arena(Battleground* bg);
     void CleanUp3v3SoloQ(Battleground* bg);
     bool CheckSolo3v3Arena(BattlegroundQueue* queue, BattlegroundBracketId bracket_id, bool isRated);

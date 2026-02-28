@@ -140,3 +140,12 @@ Solo.3v3.ArenaPointsMinLevel = 70
 Solo.3v3.VendorRating = 0
 
 Solo.3v3.ShowMessageOnLogin = 0
+
+###################################################################################################
+#   SOLO 3v3 RATED LADDER
+#
+#   Solo.3v3.Rated.KFactor
+#       Description: Elo K-factor for Solo 3v3 rated ladder updates.
+#       Default: 32
+#
+Solo.3v3.Rated.KFactor = 32

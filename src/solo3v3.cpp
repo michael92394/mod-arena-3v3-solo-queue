@@ -27,7 +27,9 @@
 #include "DisableMgr.h"
 #include "SocialMgr.h"
 #include "WorldSessionMgr.h"
+#include <fmt/format.h>
 #include <algorithm>
+#include <cmath>
 #include <functional>
 
 Solo3v3* Solo3v3::instance()
@@ -45,6 +47,110 @@ uint32 Solo3v3::GetAverageMMR(ArenaTeam* team)
     uint32 matchMakerRating = team->GetStats().Rating;
 
     return matchMakerRating;
+}
+
+// ---------------- Solo rated ladder (separate from ArenaTeam) ----------------
+namespace
+{
+    static constexpr char const* SOLO_RATING_TABLE = "character_solo3v3_rating";
+
+    struct SoloRatingRow
+    {
+        uint32 rating = 1500;
+        uint32 mmr = 1500;
+        uint32 games = 0;
+        uint32 wins = 0;
+        uint32 losses = 0;
+    };
+
+    static SoloRatingRow LoadOrCreateSoloRow(Player* player)
+    {
+        SoloRatingRow row;
+        if (!player)
+            return row;
+
+        uint32 guidLow = player->GetGUID().GetCounter();
+        QueryResult res = CharacterDatabase.Query(fmt::format(
+            "SELECT rating, mmr, games, wins, losses FROM `{}` WHERE guid = {} LIMIT 1",
+            SOLO_RATING_TABLE, guidLow));
+
+        if (res)
+        {
+            Field* f = res->Fetch();
+            row.rating = f[0].Get<uint32>();
+            row.mmr = f[1].Get<uint32>();
+            row.games = f[2].Get<uint32>();
+            row.wins = f[3].Get<uint32>();
+            row.losses = f[4].Get<uint32>();
+            return row;
+        }
+
+        // Create default row
+        CharacterDatabase.Execute(fmt::format(
+            "INSERT INTO `{}` (guid, rating, mmr, games, wins, losses, last_update) VALUES ({}, 1500, 1500, 0, 0, 0, {})",
+            SOLO_RATING_TABLE, guidLow, (uint32)GameTime::GetGameTime()));
+
+        return row;
+    }
+
+    static void SaveSoloRow(Player* player, SoloRatingRow const& row)
+    {
+        if (!player)
+            return;
+        uint32 guidLow = player->GetGUID().GetCounter();
+        CharacterDatabase.Execute(fmt::format(
+            "UPDATE `{}` SET rating={}, mmr={}, games={}, wins={}, losses={}, last_update={} WHERE guid = {}",
+            SOLO_RATING_TABLE, row.rating, row.mmr, row.games, row.wins, row.losses, (uint32)GameTime::GetGameTime(), guidLow));
+    }
+
+    static float ExpectedScore(uint32 myMmr, uint32 oppMmr)
+    {
+        // Elo expected score
+        float diff = float(int32(oppMmr) - int32(myMmr));
+        return 1.0f / (1.0f + powf(10.0f, diff / 400.0f));
+    }
+}
+
+bool Solo3v3::GetSoloRatingAndMMR(Player* player, uint32& rating, uint32& mmr)
+{
+    SoloRatingRow row = LoadOrCreateSoloRow(player);
+    rating = row.rating;
+    mmr = row.mmr;
+    return true;
+}
+
+void Solo3v3::UpdateSoloLadderAfterMatch(Player* player, bool isWin, bool isDraw, uint32 myTeamMMR, uint32 oppTeamMMR)
+{
+    if (!player)
+        return;
+
+    SoloRatingRow row = LoadOrCreateSoloRow(player);
+
+    row.games += 1;
+    if (isDraw)
+    {
+        // no rating change
+        SaveSoloRow(player, row);
+        return;
+    }
+
+    if (isWin)
+        row.wins += 1;
+    else
+        row.losses += 1;
+
+    int32 k = sConfigMgr->GetOption<int32>("Solo.3v3.Rated.KFactor", 32);
+    float expected = ExpectedScore(row.mmr, oppTeamMMR ? oppTeamMMR : row.mmr);
+    float score = isWin ? 1.0f : 0.0f;
+    int32 delta = int32(lroundf(float(k) * (score - expected)));
+
+    int32 newRating = int32(row.rating) + delta;
+    int32 newMmr = int32(row.mmr) + delta;
+
+    row.rating = uint32(newRating < 0 ? 0 : newRating);
+    row.mmr = uint32(newMmr < 0 ? 0 : newMmr);
+
+    SaveSoloRow(player, row);
 }
 
 void Solo3v3::CountAsLoss(Player* player, bool isInProgress)
