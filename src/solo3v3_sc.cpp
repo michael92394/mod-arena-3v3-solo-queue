@@ -67,15 +67,11 @@ bool NpcSolo3v3::OnGossipHello(Player* player, Creature* creature)
         AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_2v2_7:30:30:-18:0|t Leave Arena queue", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_LEAVE_QUEUE, "Are you sure you want to leave the arena queue?", 0, false);
 
     if (!inSoloQueue && !inNormal3v3)
-        AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_3v3_5:30:30:-18:0|t Queue Solo 3v3 (Skirmish)\n", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_UNRATED);
-", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_UNRATED);
+		AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_3v3_5:30:30:-18:0|t Queue Solo 3v3 (Skirmish)", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_UNRATED);
 
-    // Rated queue does NOT require an ArenaTeam anymore (separate solo ladder).
-    // Show the Rated option whenever the player is not already in the solo queue.
-    bool ratedEnabled = sConfigMgr->GetOption<bool>("Solo.3v3.Rated.Enable", true);
-    if (ratedEnabled && !inSoloQueue && !inNormal3v3)
-        AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_3v3_5:30:30:-18:0|t Queue 3v3soloQ (Rated)\n", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_RATED);
-
+	bool ratedEnabled = sConfigMgr->GetOption<bool>("Solo.3v3.Rated.Enable", true);
+	if (ratedEnabled && !inSoloQueue && !inNormal3v3)
+		AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_3v3_5:30:30:-18:0|t Queue 3v3soloQ (Rated)", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_RATED);
 
     // Solo Queue uses a separate ladder table and does NOT require a permanent ArenaTeam.
     // Keep the NPC UI focused on queueing + stats (no create/disband team).
