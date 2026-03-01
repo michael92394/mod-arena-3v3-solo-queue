@@ -695,19 +695,21 @@ void Team3v3arena::OnGetArenaPoints(ArenaTeam* at, float& points)
     }
 }
 
-void Team3v3arena::OnTypeIDToQueueID(const BattlegroundTypeId, const uint8 arenaType, uint32& _bgQueueTypeId)
+void Team3v3arena::OnTypeIDToQueueID(const BattlegroundTypeId /*bgTypeId*/, const uint8 arenaType, uint32& _bgQueueTypeId)
 {
-    if (arenaType == ARENA_TYPE_3v3_SOLO)
-    {
+    // Keep solo queue isolated in its own queue id bucket,
+    // regardless of whether caller uses our custom arena type.
+    if (arenaType == ARENA_TYPE_3v3_SOLO || arenaType == ARENA_TYPE_3v3)
         _bgQueueTypeId = bgQueueTypeId;
-    }
 }
 
 void Team3v3arena::OnQueueIdToArenaType(const BattlegroundQueueTypeId _bgQueueTypeId, uint8& arenaType)
 {
     if (_bgQueueTypeId == bgQueueTypeId)
     {
-        arenaType = ARENA_TYPE_3v3_SOLO;
+        // Force client/announce/UI to treat it as 3v3 so it prints 3v3 / 3x3.
+        arenaType = ARENA_TYPE_3v3; // <-- this is the key change
+        return;
     }
 }
 
