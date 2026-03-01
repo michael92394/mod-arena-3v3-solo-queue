@@ -84,10 +84,7 @@ public:
         WORLDHOOK_ON_AFTER_CONFIG_LOAD
     }) {}
 
-    
-
-    virtual ~ConfigLoader3v3Arena();
-virtual void OnAfterConfigLoad(bool /*Reload*/) override;
+    virtual void OnAfterConfigLoad(bool /*Reload*/) override;
 };
 
 class Team3v3arena : public ArenaTeamScript
@@ -100,10 +97,7 @@ public:
         ARENATEAMHOOK_ON_QUEUEID_TO_ARENA_TYPE
     }) {}
 
-    
-
-    virtual ~Team3v3arena();
-void OnGetSlotByType(const uint32 type, uint8& slot) override;
+    void OnGetSlotByType(const uint32 type, uint8& slot) override;
     void OnGetArenaPoints(ArenaTeam* at, float& points) override;
     void OnTypeIDToQueueID(const BattlegroundTypeId, const uint8 arenaType, uint32& _bgQueueTypeId) override;
     void OnQueueIdToArenaType(const BattlegroundQueueTypeId _bgQueueTypeId, uint8& arenaType) override;
@@ -141,10 +135,7 @@ public:
         ARENAHOOK_ON_ARENA_START
     }) { }
 
-    
-
-    virtual ~Arena_SC();
-bool CanAddMember(ArenaTeam* team, ObjectGuid /* playerGuid */) override
+    bool CanAddMember(ArenaTeam* team, ObjectGuid /* playerGuid */) override
     {
         if (!team)
             return false;

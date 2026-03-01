@@ -83,7 +83,27 @@ public:
             return false;
         }
 
-        // Rated solo uses the separate solo ladder (no ArenaTeam creation required).
+        if (isRated)
+        {
+            if (!player->GetArenaTeamId(ARENA_SLOT_SOLO_3v3))
+            {
+                uint32 cost = sConfigMgr->GetOption<uint32>("Solo.3v3.Cost", 1);
+
+                if (player->GetMoney() < cost)
+                {
+                    handler->PSendSysMessage("You need {} gold to create a Solo 3v3 arena team.", cost / GOLD);
+                    return false;
+                }
+
+                if (!SoloCommand.CreateArenateam(player, nullptr))
+                    return false;
+
+                player->ModifyMoney(-int32(cost));
+
+                handler->SendSysMessage("Solo 3v3 arena team created successfully. Use the command again to join the rated queue.");
+                return true;
+            }
+        }
 
         if (!SoloCommand.ArenaCheckFullEquipAndTalents(player))
             return false;
@@ -100,11 +120,44 @@ public:
         if (!player)
             return false;
 
-        uint32 rating = 1500;
-        uint32 mmr = 1500;
-        sSolo->GetSoloRatingAndMMR(player, rating, mmr);
+        uint32 teamId = player->GetArenaTeamId(ARENA_SLOT_SOLO_3v3);
+        if (!teamId)
+        {
+            handler->SendSysMessage("You are not in a Solo 3v3 arena team.");
+            return true;
+        }
 
-        handler->PSendSysMessage("=== Solo 3v3 Statistics ===\nSolo Rating: {}\nSolo MMR: {}", rating, mmr);
+        ArenaTeam* at = sArenaTeamMgr->GetArenaTeamById(teamId);
+        if (!at)
+        {
+            handler->SendSysMessage("Solo 3v3 arena team not found.");
+            return true;
+        }
+
+        ArenaTeamStats const& stats = at->GetStats();
+
+        std::stringstream s;
+        s << "=== Solo 3v3 Statistics ===";
+        s << "\nRating: " << stats.Rating;
+        s << "\nPersonal Rating: " << player->GetArenaPersonalRating(ARENA_SLOT_SOLO_3v3);
+        s << "\nRank: " << stats.Rank;
+        s << "\nSeason Games: " << stats.SeasonGames;
+        s << "\nSeason Wins: " << stats.SeasonWins;
+        s << "\nWeek Games: " << stats.WeekGames;
+        s << "\nWeek Wins: " << stats.WeekWins;
+
+        handler->PSendSysMessage("{}", s.str().c_str());
+
+        for (ArenaTeam::MemberList::const_iterator itr = at->GetMembers().begin();
+            itr != at->GetMembers().end(); ++itr)
+        {
+            if (itr->Guid == player->GetGUID())
+            {
+                handler->PSendSysMessage("Solo MMR: {}", itr->MatchMakerRating);
+                break;
+            }
+        }
+
         return true;
     }
 
