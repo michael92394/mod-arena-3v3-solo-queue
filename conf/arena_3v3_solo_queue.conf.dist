@@ -101,7 +101,7 @@ Solo.3v3.RatingPenalty.LeaveBeforeMatchStart = 50
 #        Description: Min level to create an arena team
 #        Default:     80
 
-Solo.3v3.MinLevel = 80
+Solo.3v3.MinLevel = 19
 
 #
 #    Solo.3v3.Cost
