@@ -131,7 +131,7 @@ void Solo3v3::CountAsLoss(Player* player, bool isInProgress)
 void Solo3v3::CleanUp3v3SoloQ(Battleground* bg)
 {
     // Cleanup temp arena teams for solo 3v3
-    if (bg->isArena() && bg->GetArenaType() == ARENA_TYPE_3v3_SOLO)
+    if (bg->isArena() && bg->GetArenaType() == ARENA_TYPE_3v3)
     {
         uint32 instanceId = bg->GetInstanceID();
         if (instanceId)
@@ -156,7 +156,7 @@ void Solo3v3::CleanUp3v3SoloQ(Battleground* bg)
 
 void Solo3v3::SaveIncompleteMatchLogs(Battleground* bg)
 {
-    if (!bg || !bg->isRated() || bg->GetArenaType() != ARENA_TYPE_3v3_SOLO)
+    if (!bg || !bg->isRated() || bg->GetArenaType() != ARENA_TYPE_3v3)
         return;
 
     if (bg->ArenaLogEntries.empty())
@@ -607,7 +607,7 @@ void Solo3v3::CreateTempArenaTeamForQueue(BattlegroundQueue* queue, ArenaTeam* a
         std::stringstream ssTeamName;
         ssTeamName << "Solo Team - " << (i + 1);
 
-        tempArenaTeam->CreateTempArenaTeam(playersList, ARENA_TYPE_3v3_SOLO, ssTeamName.str());
+        tempArenaTeam->CreateTempArenaTeam(playersList, ARENA_TYPE_3v3, ssTeamName.str());
         sArenaTeamMgr->AddArenaTeam(tempArenaTeam);
         arenaTeams[i] = tempArenaTeam;
     }

@@ -164,7 +164,7 @@ bool NpcSolo3v3::OnGossipSelect(Player* player, Creature* creature, uint32 /*sen
         {
             if (player->InBattlegroundQueueForBattlegroundQueueType((BattlegroundQueueTypeId)BATTLEGROUND_QUEUE_3v3_SOLO))
             {
-                uint8 arenaType = ARENA_TYPE_3v3_SOLO;
+                uint8 arenaType = ARENA_TYPE_3v3;
 
                 WorldPacket Data;
                 Data << arenaType << (uint8)0x0 << (uint32)BATTLEGROUND_AA << (uint16)0x0 << (uint8)0x0;
@@ -284,7 +284,7 @@ bool NpcSolo3v3::JoinQueueArena(Player* player, Creature* /*creature*/, bool isR
     if (sConfigMgr->GetOption<uint32>("Solo.3v3.MinLevel", 80) > player->GetLevel())
         return false;
 
-    uint8 arenatype = ARENA_TYPE_3v3_SOLO;
+    uint8 arenatype = ARENA_TYPE_3v3;
     uint32 arenaRating = 0;
     uint32 matchmakerRating = 0;
 
@@ -361,7 +361,7 @@ bool NpcSolo3v3::JoinQueueArena(Player* player, Creature* /*creature*/, bool isR
         matchmakerRating = 1;
     }
 
-    sBattlegroundMgr->ScheduleQueueUpdate(matchmakerRating, ARENA_TYPE_3v3_SOLO, bgQueueTypeId, bgTypeId, bracketEntry->GetBracketId());
+    sBattlegroundMgr->ScheduleQueueUpdate(matchmakerRating, ARENA_TYPE_3v3, bgQueueTypeId, bgTypeId, bracketEntry->GetBracketId());
 
     sScriptMgr->OnPlayerJoinArena(player);
 
@@ -401,7 +401,7 @@ bool NpcSolo3v3::CreateArenateam(Player* player, Creature* /*creature*/)
     // Create arena team
     ArenaTeam* arenaTeam = new ArenaTeam();
 
-    if (!arenaTeam->Create(player->GetGUID(), uint8(ARENA_TYPE_3v3_SOLO), teamName.str(), 4283124816, 45, 4294242303, 5, 4294705149))
+    if (!arenaTeam->Create(player->GetGUID(), uint8(ARENA_TYPE_3v3), teamName.str(), 4283124816, 45, 4294242303, 5, 4294705149))
     {
         delete arenaTeam;
         return false;
@@ -488,7 +488,7 @@ void NpcSolo3v3::fetchQueueList()
 
 void Solo3v3BG::OnQueueUpdate(BattlegroundQueue* queue, uint32 /*diff*/, BattlegroundTypeId bgTypeId, BattlegroundBracketId bracket_id, uint8 arenaType, bool isRated, uint32 /*arenaRatedTeamId*/)
 {
-    if (arenaType != (ArenaType)ARENA_TYPE_3v3_SOLO)
+    if (arenaType != (ArenaType)ARENA_TYPE_3v3)
         return;
 
     Battleground* bg_template = sBattlegroundMgr->GetBattlegroundTemplate(bgTypeId);
@@ -543,7 +543,7 @@ void Solo3v3BG::OnQueueUpdate(BattlegroundQueue* queue, uint32 /*diff*/, Battleg
 bool Solo3v3BG::OnQueueUpdateValidity(BattlegroundQueue* /* queue */, uint32 /*diff*/, BattlegroundTypeId /* bgTypeId */, BattlegroundBracketId /* bracket_id */, uint8 arenaType, bool /* isRated */, uint32 /*arenaRatedTeamId*/)
 {
     // if it's an arena 3v3soloQueue, return false to exit from BattlegroundQueueUpdate
-    if (arenaType == (ArenaType)ARENA_TYPE_3v3_SOLO)
+    if (arenaType == (ArenaType)ARENA_TYPE_3v3)
         return false;
 
     return true;
@@ -556,7 +556,7 @@ void Solo3v3BG::OnBattlegroundDestroy(Battleground* bg)
 
 void Solo3v3BG::OnBattlegroundEndReward(Battleground* bg, Player* player, TeamId winnerTeamId)
 {
-    if (bg->isRated() && bg->GetArenaType() == ARENA_TYPE_3v3_SOLO)
+    if (bg->isRated() && bg->GetArenaType() == ARENA_TYPE_3v3)
     {
         // this way we always get the correct solo team (sometimes when using GetArenaTeamByCaptain inside solo arena it can return a teamID >= 4293918720)
         ArenaTeam* plrArenaTeam = sArenaTeamMgr->GetArenaTeamById(player->GetArenaTeamId(ARENA_SLOT_SOLO_3v3));
@@ -666,16 +666,16 @@ void Solo3v3BG::OnBattlegroundEndReward(Battleground* bg, Player* player, TeamId
 void ConfigLoader3v3Arena::OnAfterConfigLoad(bool /*Reload*/)
 {
     ArenaTeam::ArenaSlotByType.emplace(ARENA_TEAM_SOLO_3v3, ARENA_SLOT_SOLO_3v3);
-    ArenaTeam::ArenaReqPlayersForType.emplace(ARENA_TYPE_3v3_SOLO, 6);
+    ArenaTeam::ArenaReqPlayersForType.emplace(ARENA_TYPE_3v3, 6);
 
     BattlegroundMgr::queueToBg.insert({ BATTLEGROUND_QUEUE_3v3_SOLO, BATTLEGROUND_AA });
-    BattlegroundMgr::QueueToArenaType.emplace(BATTLEGROUND_QUEUE_3v3_SOLO, (ArenaType)ARENA_TYPE_3v3_SOLO);
-    BattlegroundMgr::ArenaTypeToQueue.emplace(ARENA_TYPE_3v3_SOLO, (BattlegroundQueueTypeId)BATTLEGROUND_QUEUE_3v3_SOLO);
+    BattlegroundMgr::QueueToArenaType.emplace(BATTLEGROUND_QUEUE_3v3_SOLO, (ArenaType)ARENA_TYPE_3v3);
+    BattlegroundMgr::ArenaTypeToQueue.emplace(ARENA_TYPE_3v3, (BattlegroundQueueTypeId)BATTLEGROUND_QUEUE_3v3_SOLO);
 }
 
 void Team3v3arena::OnGetSlotByType(const uint32 type, uint8& slot)
 {
-    if (type == ARENA_TYPE_3v3_SOLO)
+    if (type == ARENA_TYPE_3v3)
     {
         slot = ARENA_SLOT_SOLO_3v3;
     }
@@ -683,7 +683,7 @@ void Team3v3arena::OnGetSlotByType(const uint32 type, uint8& slot)
 
 void Team3v3arena::OnGetArenaPoints(ArenaTeam* at, float& points)
 {
-    if (at->GetType() == ARENA_TYPE_3v3_SOLO)
+    if (at->GetType() == ARENA_TYPE_3v3)
     {
         const auto Members = at->GetMembers();
         uint8 playerLevel = sCharacterCache->GetCharacterLevelByGuid(Members.front().Guid);
@@ -699,7 +699,7 @@ void Team3v3arena::OnTypeIDToQueueID(const BattlegroundTypeId /*bgTypeId*/, cons
 {
     // Keep solo queue isolated in its own queue id bucket,
     // regardless of whether caller uses our custom arena type.
-    if (arenaType == ARENA_TYPE_3v3_SOLO || arenaType == ARENA_TYPE_3v3)
+    if (arenaType == ARENA_TYPE_3v3 || arenaType == ARENA_TYPE_3v3)
         _bgQueueTypeId = bgQueueTypeId;
 }
 
@@ -715,7 +715,7 @@ void Team3v3arena::OnQueueIdToArenaType(const BattlegroundQueueTypeId _bgQueueTy
 
 void Arena_SC::OnArenaStart(Battleground* bg)
 {
-    if (bg->GetArenaType() != ARENA_TYPE_3v3_SOLO)
+    if (bg->GetArenaType() != ARENA_TYPE_3v3)
         return;
 
     sSolo->CheckStartSolo3v3Arena(bg);
@@ -729,7 +729,7 @@ void PlayerScript3v3Arena::OnPlayerBattlegroundDesertion(Player* player, const B
     {
         case ARENA_DESERTION_TYPE_LEAVE_BG:
 
-            if (bg->GetArenaType() == ARENA_TYPE_3v3_SOLO)
+            if (bg->GetArenaType() == ARENA_TYPE_3v3)
             {
                 if (bg->GetStatus() == STATUS_WAIT_JOIN)
                 {
@@ -810,7 +810,7 @@ void PlayerScript3v3Arena::OnPlayerGetArenaPersonalRating(Player* player, uint8 
 {
     if (slot == ARENA_SLOT_SOLO_3v3)
     {
-        if (ArenaTeam* at = sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_3v3_SOLO))
+        if (ArenaTeam* at = sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_3v3))
         {
             rating = at->GetRating();
         }
@@ -826,7 +826,7 @@ void PlayerScript3v3Arena::OnPlayerGetMaxPersonalArenaRatingRequirement(const Pl
 
     if (minslot < 6)
     {
-        if (ArenaTeam* at = sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_3v3_SOLO))
+        if (ArenaTeam* at = sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_3v3))
         {
             maxArenaRating = std::max(at->GetRating(), maxArenaRating);
         }
@@ -839,7 +839,7 @@ void PlayerScript3v3Arena::OnPlayerGetArenaTeamId(Player* player, uint8 slot, ui
         return;
 
     if (slot == ARENA_SLOT_SOLO_3v3)
-        result = player->GetArenaTeamIdFromDB(player->GetGUID(), ARENA_TYPE_3v3_SOLO);
+        result = player->GetArenaTeamIdFromDB(player->GetGUID(), ARENA_TYPE_3v3);
 }
 
 bool PlayerScript3v3Arena::OnPlayerNotSetArenaTeamInfoField(Player* player, uint8 slot, ArenaTeamInfoType /* type */, uint32 /* value */)
@@ -876,17 +876,17 @@ void AddSC_Solo_3v3_Arena()
     if (!ArenaTeam::ArenaSlotByType.count(ARENA_TEAM_SOLO_3v3))
         ArenaTeam::ArenaSlotByType[ARENA_TEAM_SOLO_3v3] = ARENA_SLOT_SOLO_3v3;
 
-    if (!ArenaTeam::ArenaReqPlayersForType.count(ARENA_TYPE_3v3_SOLO))
-        ArenaTeam::ArenaReqPlayersForType[ARENA_TYPE_3v3_SOLO] = 6;
+    if (!ArenaTeam::ArenaReqPlayersForType.count(ARENA_TYPE_3v3))
+        ArenaTeam::ArenaReqPlayersForType[ARENA_TYPE_3v3] = 6;
 
     if (!BattlegroundMgr::queueToBg.count(BATTLEGROUND_QUEUE_3v3_SOLO))
         BattlegroundMgr::queueToBg[BATTLEGROUND_QUEUE_3v3_SOLO] = BATTLEGROUND_AA;
 
-    if (!BattlegroundMgr::ArenaTypeToQueue.count(ARENA_TYPE_3v3_SOLO))
-        BattlegroundMgr::ArenaTypeToQueue[ARENA_TYPE_3v3_SOLO] = (BattlegroundQueueTypeId)BATTLEGROUND_QUEUE_3v3_SOLO;
+    if (!BattlegroundMgr::ArenaTypeToQueue.count(ARENA_TYPE_3v3))
+        BattlegroundMgr::ArenaTypeToQueue[ARENA_TYPE_3v3] = (BattlegroundQueueTypeId)BATTLEGROUND_QUEUE_3v3_SOLO;
 
     if (!BattlegroundMgr::QueueToArenaType.count(BATTLEGROUND_QUEUE_3v3_SOLO))
-        BattlegroundMgr::QueueToArenaType[BATTLEGROUND_QUEUE_3v3_SOLO] = (ArenaType)ARENA_TYPE_3v3_SOLO;
+        BattlegroundMgr::QueueToArenaType[BATTLEGROUND_QUEUE_3v3_SOLO] = (ArenaType)ARENA_TYPE_3v3;
 
     new NpcSolo3v3();
     new Solo3v3BG();
