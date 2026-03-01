@@ -27,13 +27,61 @@
 #include "DisableMgr.h"
 #include "SocialMgr.h"
 #include "WorldSessionMgr.h"
+#include <fmt/format.h>
 #include <algorithm>
 #include <functional>
+
+// ---------------- Solo rated ladder (separate from ArenaTeam) ----------------
+namespace
+{
+    static constexpr char const* SOLO_RATING_TABLE = "character_solo3v3_rating";
+
+    struct SoloRatingRow
+    {
+        uint32 rating = 1500;
+        uint32 mmr = 1500;
+    };
+
+    static SoloRatingRow LoadOrCreateSoloRow(Player* player)
+    {
+        SoloRatingRow row;
+        if (!player)
+            return row;
+
+        uint32 guidLow = player->GetGUID().GetCounter();
+        QueryResult res = CharacterDatabase.Query(fmt::format(
+            "SELECT rating, mmr FROM `{}` WHERE guid = {} LIMIT 1",
+            SOLO_RATING_TABLE, guidLow));
+
+        if (res)
+        {
+            Field* f = res->Fetch();
+            row.rating = f[0].Get<uint32>();
+            row.mmr    = f[1].Get<uint32>();
+            return row;
+        }
+
+        // Create default row
+        CharacterDatabase.Execute(fmt::format(
+            "INSERT INTO `{}` (guid, rating, mmr, games, wins, losses, last_update) VALUES ({}, 1500, 1500, 0, 0, 0, {})",
+            SOLO_RATING_TABLE, guidLow, static_cast<uint32>(GameTime::GetGameTime().count())));
+
+        return row;
+    }
+}
 
 Solo3v3* Solo3v3::instance()
 {
     static Solo3v3 instance;
     return &instance;
+}
+
+bool Solo3v3::GetSoloRatingAndMMR(Player* player, uint32& rating, uint32& mmr)
+{
+    SoloRatingRow row = LoadOrCreateSoloRow(player);
+    rating = row.rating;
+    mmr    = row.mmr;
+    return true;
 }
 
 uint32 Solo3v3::GetAverageMMR(ArenaTeam* team)

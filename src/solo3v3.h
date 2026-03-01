@@ -117,6 +117,11 @@ class Solo3v3
 public:
     static Solo3v3* instance();
 
+    // ---------------- Solo rated ladder (separate from ArenaTeam) ----------------
+    // Returns the player's Solo 3v3 rating/MMR from Characters DB table
+    // `character_solo3v3_rating` (creates a default row if missing).
+    bool GetSoloRatingAndMMR(Player* player, uint32& rating, uint32& mmr);
+
     uint32 GetAverageMMR(ArenaTeam* team);
     void CheckStartSolo3v3Arena(Battleground* bg);
     void CleanUp3v3SoloQ(Battleground* bg);
