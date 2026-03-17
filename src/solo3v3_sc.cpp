@@ -294,12 +294,10 @@ bool NpcSolo3v3::JoinQueueArena(Player* player, Creature* /*creature*/, bool isR
     if (!bracketEntry)
         return false;
 
-    // check if already in queue
-    if (player->GetBattlegroundQueueIndex(queueTypeId) < PLAYER_MAX_BATTLEGROUND_QUEUES)
-        return false;
-
-    // check if has free queue slots
-    if (!player->HasFreeBattlegroundQueueId())
+    // Only reject when the player is already in this exact queue.
+    // GetBattlegroundQueueIndex returns PLAYER_MAX_BATTLEGROUND_QUEUES when the queue is not present,
+    // so the old "< PLAYER_MAX_BATTLEGROUND_QUEUES" check inverted the meaning and blocked fresh joins.
+    if (player->GetBattlegroundQueueIndex(queueTypeId) >= PLAYER_MAX_BATTLEGROUND_QUEUES && !player->HasFreeBattlegroundQueueId())
         return false;
 
     uint32 ateamId = 0;
