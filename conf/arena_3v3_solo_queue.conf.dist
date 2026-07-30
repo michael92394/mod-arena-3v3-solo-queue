@@ -20,7 +20,7 @@ Solo.3v3.Enable = 1
 #
 Solo.3v3.EnableCommand = 1
 
-Solo.3v3.EnableTestingCommand = 1
+Solo.3v3.EnableTestingCommand = 0
 
 
 #   Solo.3v3.FilterTalents
@@ -98,36 +98,34 @@ Solo.3v3.RatingPenalty.LeaveBeforeMatchStart = 50
 
 #
 #    Solo.3v3.MinLevel
-#        Description: Min level to create an arena team
-#        Default:     80
+#        Description: Minimum level to enter the Solo 3v3 queue
+#        Default:     19
 
 Solo.3v3.MinLevel = 19
 
 #
-#    Solo.3v3.Cost
-#        Description: Costs for create an arena team
+#    Solo.3v3.Cost (legacy compatibility only)
+#        Description: No longer charged by the standalone Solo 3v3 ladder
 #        Default:     100000 - (10 gold)
 
 Solo.3v3.Cost = 100000
 
 #
-#    Solo.3v3.ArenaPointsMulti
-#        Description: An 5v5 arena team with 1500 rating will gain 344 points per week (blizzlike).
-#                      3v3 with same rating will gain 302 points (5v5points * 0.88)
-#                      2v2 will gain 261 points (5v5points * 0.76)
-#                      and 3v3soloQ will gain 167 points (5v5points * 0.64)
-#                      With this multiplier you can modify the arenapoints for 3v3soloQ.
+#    Solo.3v3.ArenaPointsMulti (legacy compatibility only)
+#        Description: Retained for forks that still calculate weekly points from persistent
+#                     Solo ArenaTeams. RTG's standalone ladder does not currently award weekly
+#                     Arena Points through this setting; use a dedicated ladder reward job.
 #        Default:     0.8
 
 Solo.3v3.ArenaPointsMulti = 0.8
 
 
 #
-#    Solo.3v3.ArenaPointsMinLevel
-#        Description: minlevel to get the arena points
-#        Default:     70
+#    Solo.3v3.ArenaPointsMinLevel (legacy compatibility only)
+#        Description: Minimum level used only by the legacy ArenaTeam points hook.
+#        Default:     19
 
-Solo.3v3.ArenaPointsMinLevel = 70
+Solo.3v3.ArenaPointsMinLevel = 19
 
 
 #
@@ -144,6 +142,14 @@ Solo.3v3.ShowMessageOnLogin = 0
 ###################################################################################################
 #   SOLO 3v3 RATED LADDER
 #
+#   Solo.3v3.Rated.Enable
+#       Description: Enables the Solo 3v3 rated ladder and rating updates.
+#                    Requires Characters table character_solo3v3_rating; the rated
+#                    lane fails closed when that schema is missing.
+#       Default: 1
+#
+Solo.3v3.Rated.Enable = 1
+
 #   Solo.3v3.Rated.KFactor
 #       Description: Elo K-factor for Solo 3v3 rated ladder updates.
 #       Default: 32

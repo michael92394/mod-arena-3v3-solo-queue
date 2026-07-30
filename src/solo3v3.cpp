@@ -29,44 +29,123 @@
 #include "WorldSessionMgr.h"
 #include <fmt/format.h>
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <limits>
 
 // ---------------- Solo rated ladder (separate from ArenaTeam) ----------------
 namespace
 {
     static constexpr char const* SOLO_RATING_TABLE = "character_solo3v3_rating";
+    static constexpr uint32 SOLO_RATING_DEFAULT = 1500;
+    static constexpr uint32 SOLO_RATING_MAX = 5000;
 
     struct SoloRatingRow
     {
-        uint32 rating = 1500;
-        uint32 mmr = 1500;
+        uint32 rating = SOLO_RATING_DEFAULT;
+        uint32 mmr = SOLO_RATING_DEFAULT;
+        uint32 games = 0;
+        uint32 wins = 0;
+        uint32 losses = 0;
     };
+
+    static bool SoloRatingStorageAvailable()
+    {
+        static bool initialized = false;
+        static bool available = false;
+        static bool missingLogged = false;
+        static uint32 nextCheck = 0;
+
+        uint32 const now = static_cast<uint32>(GameTime::GetGameTime().count());
+        if (!initialized || now >= nextCheck)
+        {
+            initialized = true;
+            available = bool(CharacterDatabase.Query(
+                "SHOW TABLES LIKE 'character_solo3v3_rating'"));
+            nextCheck = now > std::numeric_limits<uint32>::max() - 60u
+                ? std::numeric_limits<uint32>::max()
+                : now + 60u;
+
+            if (!available && !missingLogged)
+            {
+                LOG_ERROR("solo3v3",
+                    "Rated Solo 3v3 is disabled because Characters table "
+                    "character_solo3v3_rating is missing. Import "
+                    "data/sql/characters/character_solo3v3_rating.sql.");
+                missingLogged = true;
+            }
+            else if (available)
+                missingLogged = false;
+        }
+
+        return available;
+    }
 
     static SoloRatingRow LoadOrCreateSoloRow(Player* player)
     {
         SoloRatingRow row;
-        if (!player)
+        if (!player || !SoloRatingStorageAvailable())
             return row;
 
         uint32 guidLow = player->GetGUID().GetCounter();
         QueryResult res = CharacterDatabase.Query(fmt::format(
-            "SELECT rating, mmr FROM `{}` WHERE guid = {} LIMIT 1",
+            "SELECT rating, mmr, games, wins, losses FROM `{}` WHERE guid = {} LIMIT 1",
             SOLO_RATING_TABLE, guidLow));
 
         if (res)
         {
             Field* f = res->Fetch();
             row.rating = f[0].Get<uint32>();
-            row.mmr    = f[1].Get<uint32>();
+            row.mmr = f[1].Get<uint32>();
+            row.games = f[2].Get<uint32>();
+            row.wins = f[3].Get<uint32>();
+            row.losses = f[4].Get<uint32>();
             return row;
         }
 
-        // Create default row
+        // INSERT IGNORE makes concurrent first-open/first-queue paths harmless.
         CharacterDatabase.Execute(fmt::format(
-            "INSERT INTO `{}` (guid, rating, mmr, games, wins, losses, last_update) VALUES ({}, 1500, 1500, 0, 0, 0, {})",
-            SOLO_RATING_TABLE, guidLow, static_cast<uint32>(GameTime::GetGameTime().count())));
+            "INSERT IGNORE INTO `{}` (guid, rating, mmr, games, wins, losses, last_update) "
+            "VALUES ({}, {}, {}, 0, 0, 0, {})",
+            SOLO_RATING_TABLE, guidLow, SOLO_RATING_DEFAULT, SOLO_RATING_DEFAULT,
+            static_cast<uint32>(GameTime::GetGameTime().count())));
 
         return row;
+    }
+
+    static float ExpectedScore(uint32 playerMmr, uint32 opponentMmr)
+    {
+        float const difference = float(int32(opponentMmr) - int32(playerMmr));
+        return 1.0f / (1.0f + std::pow(10.0f, difference / 400.0f));
+    }
+
+    static uint32 ApplyDeltaToDefault(int32 delta)
+    {
+        int64 const value = int64(SOLO_RATING_DEFAULT) + int64(delta);
+        return uint32(std::clamp<int64>(value, 0, SOLO_RATING_MAX));
+    }
+
+    static void ApplyAtomicSoloUpdate(Player* player, int32 delta, uint32 games, uint32 wins, uint32 losses)
+    {
+        if (!player || !SoloRatingStorageAvailable())
+            return;
+
+        uint32 const guidLow = player->GetGUID().GetCounter();
+        uint32 const now = static_cast<uint32>(GameTime::GetGameTime().count());
+        uint32 const initial = ApplyDeltaToDefault(delta);
+
+        // The update is atomic in SQL, so two close result paths cannot overwrite
+        // each other's counters or restore an older rating snapshot.
+        CharacterDatabase.Execute(fmt::format(
+            "INSERT INTO `{}` (guid, rating, mmr, games, wins, losses, last_update) "
+            "VALUES ({}, {}, {}, {}, {}, {}, {}) "
+            "ON DUPLICATE KEY UPDATE "
+            "rating=LEAST({}, GREATEST(0, CAST(rating AS SIGNED) + ({}))), "
+            "mmr=LEAST({}, GREATEST(0, CAST(mmr AS SIGNED) + ({}))), "
+            "games=games+VALUES(games), wins=wins+VALUES(wins), losses=losses+VALUES(losses), "
+            "last_update=VALUES(last_update)",
+            SOLO_RATING_TABLE, guidLow, initial, initial, games, wins, losses, now,
+            SOLO_RATING_MAX, delta, SOLO_RATING_MAX, delta));
     }
 }
 
@@ -76,12 +155,73 @@ Solo3v3* Solo3v3::instance()
     return &instance;
 }
 
+
+bool Solo3v3::IsRatedEnabled()
+{
+    return sConfigMgr->GetOption<bool>("Solo.3v3.Rated.Enable", true) &&
+        SoloRatingStorageAvailable();
+}
+
 bool Solo3v3::GetSoloRatingAndMMR(Player* player, uint32& rating, uint32& mmr)
 {
-    SoloRatingRow row = LoadOrCreateSoloRow(player);
+    rating = SOLO_RATING_DEFAULT;
+    mmr = SOLO_RATING_DEFAULT;
+    if (!player || !SoloRatingStorageAvailable())
+        return false;
+
+    SoloRatingRow const row = LoadOrCreateSoloRow(player);
     rating = row.rating;
-    mmr    = row.mmr;
+    mmr = row.mmr;
     return true;
+}
+
+bool Solo3v3::GetSoloStats(Player* player, uint32& rating, uint32& mmr, uint32& games, uint32& wins, uint32& losses)
+{
+    rating = SOLO_RATING_DEFAULT;
+    mmr = SOLO_RATING_DEFAULT;
+    games = 0;
+    wins = 0;
+    losses = 0;
+    if (!player || !SoloRatingStorageAvailable())
+        return false;
+
+    SoloRatingRow const row = LoadOrCreateSoloRow(player);
+    rating = row.rating;
+    mmr = row.mmr;
+    games = row.games;
+    wins = row.wins;
+    losses = row.losses;
+    return true;
+}
+
+void Solo3v3::UpdateSoloLadderAfterMatch(Player* player, bool isWin, bool isDraw, uint32 ownTeamMMR, uint32 opponentTeamMMR)
+{
+    if (!player)
+        return;
+
+    if (isDraw)
+    {
+        ApplyAtomicSoloUpdate(player, 0, 1, 0, 0);
+        return;
+    }
+
+    SoloRatingRow const row = LoadOrCreateSoloRow(player);
+    uint32 const comparisonMmr = opponentTeamMMR ? opponentTeamMMR : (ownTeamMMR ? ownTeamMMR : row.mmr);
+    int32 const kFactor = std::clamp<int32>(sConfigMgr->GetOption<int32>("Solo.3v3.Rated.KFactor", 32), 1, 128);
+    float const expected = ExpectedScore(row.mmr, comparisonMmr);
+    float const score = isWin ? 1.0f : 0.0f;
+    int32 const delta = int32(std::lround(float(kFactor) * (score - expected)));
+
+    ApplyAtomicSoloUpdate(player, delta, 1, isWin ? 1u : 0u, isWin ? 0u : 1u);
+}
+
+void Solo3v3::ApplySoloLadderPenalty(Player* player, uint32 ratingLoss)
+{
+    if (!player || ratingLoss == 0)
+        return;
+
+    uint32 const clampedLoss = std::min<uint32>(ratingLoss, SOLO_RATING_MAX);
+    ApplyAtomicSoloUpdate(player, -int32(clampedLoss), 1, 0, 1);
 }
 
 uint32 Solo3v3::GetAverageMMR(ArenaTeam* team)
@@ -97,89 +237,47 @@ uint32 Solo3v3::GetAverageMMR(ArenaTeam* team)
 
 void Solo3v3::CountAsLoss(Player* player, bool isInProgress)
 {
-    if (player->IsSpectator())
+    if (!player || player->IsSpectator())
         return;
 
-    ArenaTeam* plrArenaTeam = sArenaTeamMgr->GetArenaTeamById(player->GetArenaTeamId(ARENA_SLOT_SOLO_3v3));
-
-    if (!plrArenaTeam)
-        return;
-
-    int32 ratingLoss = 0;
     uint32 instanceId = 0;
-
-    bool playerLeftAlive = player->IsAlive();
+    bool const playerLeftAlive = player->IsAlive();
 
     if (Battleground* bg = player->GetBattleground())
         instanceId = bg->GetInstanceID();
 
-    // leave while arena is in progress but player is already dead - no penalty
+    // Leaving after death cannot be used to inflict a second penalty.
     if (isInProgress && !playerLeftAlive)
         return;
 
-    // leave while arena is in progress
-    if (isInProgress && playerLeftAlive)
+    int32 ratingLoss = 0;
+    if (isInProgress)
     {
-        bool isFirstLeaver = instanceId && arenasWithDeserter.count(instanceId) == 0;
-        ratingLoss = sConfigMgr->GetOption<int32>(isFirstLeaver ? "Solo.3v3.RatingPenalty.FirstLeaveDuringMatch" : "Solo.3v3.RatingPenalty.LeaveDuringMatch", isFirstLeaver ? 50 : 24);
+        bool const isFirstLeaver = instanceId && arenasWithDeserter.count(instanceId) == 0;
+        ratingLoss = sConfigMgr->GetOption<int32>(
+            isFirstLeaver ? "Solo.3v3.RatingPenalty.FirstLeaveDuringMatch" : "Solo.3v3.RatingPenalty.LeaveDuringMatch",
+            isFirstLeaver ? 50 : 24);
 
         if (isFirstLeaver)
         {
             arenasWithDeserter.insert(instanceId);
-
             if (sConfigMgr->GetOption<bool>("Solo.3v3.CastDeserterOnLeave", true))
                 player->CastSpell(player, 26013, true);
         }
     }
     else
     {
-        // leave while arena is in preparation || don't accept queue || logout while invited
         ratingLoss = sConfigMgr->GetOption<int32>("Solo.3v3.RatingPenalty.LeaveBeforeMatchStart", 50);
         player->CastSpell(player, 26013, true);
     }
 
-    ArenaTeamStats atStats = plrArenaTeam->GetStats();
-
-    if (int32(atStats.Rating) - ratingLoss < 0)
-        atStats.Rating = 0;
-    else
-        atStats.Rating -= ratingLoss;
-
-    atStats.SeasonGames += 1;
-    atStats.WeekGames += 1;
-    atStats.Rank = 1;
-
-    // Update team's rank, start with rank 1 and increase until no team with more rating was found
-    ArenaTeamMgr::ArenaTeamContainer::const_iterator i = sArenaTeamMgr->GetArenaTeamMapBegin();
-    for (; i != sArenaTeamMgr->GetArenaTeamMapEnd(); ++i) {
-        if (i->second->GetType() == ARENA_TEAM_SOLO_3v3 && i->second->GetStats().Rating > atStats.Rating)
-            ++atStats.Rank;
-    }
-
-    for (ArenaTeam::MemberList::iterator itr = plrArenaTeam->GetMembers().begin(); itr != plrArenaTeam->GetMembers().end(); ++itr) {
-        if (itr->Guid == player->GetGUID()) {
-            itr->WeekGames += 1;
-            itr->SeasonGames += 1;
-            itr->PersonalRating = atStats.Rating;
-
-            if (int32(itr->MatchMakerRating) - ratingLoss < 0)
-                itr->MatchMakerRating = 0;
-            else
-                itr->MatchMakerRating -= ratingLoss;
-
-            break;
-        }
-    }
-
-    plrArenaTeam->SetArenaTeamStats(atStats);
-    plrArenaTeam->NotifyStatsChanged();
-    plrArenaTeam->SaveToDB(true);
+    ApplySoloLadderPenalty(player, uint32(std::max<int32>(0, ratingLoss)));
 }
 
 void Solo3v3::CleanUp3v3SoloQ(Battleground* bg)
 {
     // Cleanup temp arena teams for solo 3v3
-    if (bg->isArena() && bg->GetArenaType() == ARENA_TYPE_3v3)
+    if (bg && bg->isArena() && bg->GetArenaType() == ARENA_TYPE_3v3_SOLO)
     {
         uint32 instanceId = bg->GetInstanceID();
         if (instanceId)
@@ -204,7 +302,7 @@ void Solo3v3::CleanUp3v3SoloQ(Battleground* bg)
 
 void Solo3v3::SaveIncompleteMatchLogs(Battleground* bg)
 {
-    if (!bg || !bg->isRated() || bg->GetArenaType() != ARENA_TYPE_3v3)
+    if (!bg || !bg->isRated() || bg->GetArenaType() != ARENA_TYPE_3v3_SOLO)
         return;
 
     if (bg->ArenaLogEntries.empty())

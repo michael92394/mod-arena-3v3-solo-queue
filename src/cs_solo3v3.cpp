@@ -76,33 +76,17 @@ public:
             return false;
         }
 
-        uint32 minLevel = sConfigMgr->GetOption<uint32>("Solo.3v3.MinLevel", 80);
+        uint32 minLevel = sConfigMgr->GetOption<uint32>("Solo.3v3.MinLevel", 19);
         if (player->GetLevel() < minLevel)
         {
             ChatHandler(player->GetSession()).PSendSysMessage("You need level {}+ to join solo arena.", minLevel);
             return false;
         }
 
-        if (isRated)
+        if (isRated && !sSolo->IsRatedEnabled())
         {
-            if (!player->GetArenaTeamId(ARENA_SLOT_SOLO_3v3))
-            {
-                uint32 cost = sConfigMgr->GetOption<uint32>("Solo.3v3.Cost", 1);
-
-                if (player->GetMoney() < cost)
-                {
-                    handler->PSendSysMessage("You need {} gold to create a Solo 3v3 arena team.", cost / GOLD);
-                    return false;
-                }
-
-                if (!SoloCommand.CreateArenateam(player, nullptr))
-                    return false;
-
-                player->ModifyMoney(-int32(cost));
-
-                handler->SendSysMessage("Solo 3v3 arena team created successfully. Use the command again to join the rated queue.");
-                return true;
-            }
+            handler->SendSysMessage("Rated Solo 3v3 is currently disabled.");
+            return false;
         }
 
         if (!SoloCommand.ArenaCheckFullEquipAndTalents(player))
@@ -120,44 +104,16 @@ public:
         if (!player)
             return false;
 
-        uint32 teamId = player->GetArenaTeamId(ARENA_SLOT_SOLO_3v3);
-        if (!teamId)
-        {
-            handler->SendSysMessage("You are not in a Solo 3v3 arena team.");
-            return true;
-        }
+        uint32 rating = 0;
+        uint32 mmr = 0;
+        uint32 games = 0;
+        uint32 wins = 0;
+        uint32 losses = 0;
+        sSolo->GetSoloStats(player, rating, mmr, games, wins, losses);
 
-        ArenaTeam* at = sArenaTeamMgr->GetArenaTeamById(teamId);
-        if (!at)
-        {
-            handler->SendSysMessage("Solo 3v3 arena team not found.");
-            return true;
-        }
-
-        ArenaTeamStats const& stats = at->GetStats();
-
-        std::stringstream s;
-        s << "=== Solo 3v3 Statistics ===";
-        s << "\nRating: " << stats.Rating;
-        s << "\nPersonal Rating: " << player->GetArenaPersonalRating(ARENA_SLOT_SOLO_3v3);
-        s << "\nRank: " << stats.Rank;
-        s << "\nSeason Games: " << stats.SeasonGames;
-        s << "\nSeason Wins: " << stats.SeasonWins;
-        s << "\nWeek Games: " << stats.WeekGames;
-        s << "\nWeek Wins: " << stats.WeekWins;
-
-        handler->PSendSysMessage("{}", s.str().c_str());
-
-        for (ArenaTeam::MemberList::const_iterator itr = at->GetMembers().begin();
-            itr != at->GetMembers().end(); ++itr)
-        {
-            if (itr->Guid == player->GetGUID())
-            {
-                handler->PSendSysMessage("Solo MMR: {}", itr->MatchMakerRating);
-                break;
-            }
-        }
-
+        handler->PSendSysMessage(
+            "=== Solo 3v3 Statistics ===\nRating: {}\nMMR: {}\nGames: {}\nWins: {}\nLosses: {}",
+            rating, mmr, games, wins, losses);
         return true;
     }
 
@@ -169,7 +125,7 @@ public:
         if (!player)
             return false;
 
-        if (!sConfigMgr->GetOption<bool>("Solo.3v3.EnableTestingCommand", true))
+        if (!sConfigMgr->GetOption<bool>("Solo.3v3.EnableTestingCommand", false))
         {
             ChatHandler(player->GetSession()).SendSysMessage("Solo 3v3 Arena testing command is disabled.");
             return false;
@@ -178,6 +134,12 @@ public:
         if (!sConfigMgr->GetOption<bool>("Solo.3v3.Enable", true))
         {
             ChatHandler(player->GetSession()).SendSysMessage("Solo 3v3 Arena is disabled.");
+            return false;
+        }
+
+        if (!sSolo->IsRatedEnabled())
+        {
+            ChatHandler(player->GetSession()).SendSysMessage("Rated Solo 3v3 is unavailable until its character schema is installed.");
             return false;
         }
 
@@ -201,28 +163,20 @@ public:
                     continue;
                 }
 
-                uint32 minLevel = sConfigMgr->GetOption<uint32>("Solo.3v3.MinLevel", 80);
+                uint32 minLevel = sConfigMgr->GetOption<uint32>("Solo.3v3.MinLevel", 19);
                 if (currentPlayer->GetLevel() < minLevel)
                 {
                     handler->PSendSysMessage("Player {} needs level {}+ to join solo arena.", player->GetName().c_str(), minLevel);
                     continue;
                 }
 
-                if (!currentPlayer->GetArenaTeamId(ARENA_SLOT_SOLO_3v3)) // ARENA_SLOT_SOLO_3v3 | ARENA_TEAM_SOLO_3v3
-                {
-                    if (!SoloCommand.CreateArenateam(currentPlayer, nullptr))
-                        continue;
-                }
-                else
-                {
-                    if (!SoloCommand.ArenaCheckFullEquipAndTalents(currentPlayer))
-                        continue;
+                if (!SoloCommand.ArenaCheckFullEquipAndTalents(currentPlayer))
+                    continue;
 
-                    if (SoloCommand.JoinQueueArena(currentPlayer, nullptr, true))
-                        handler->PSendSysMessage("Player {} has joined the solo 3v3 arena queue.", currentPlayer->GetName().c_str());
-                    else
-                        handler->PSendSysMessage("Failed to join queue for player {}.", currentPlayer->GetName().c_str());
-                }
+                if (SoloCommand.JoinQueueArena(currentPlayer, nullptr, true))
+                    handler->PSendSysMessage("Player {} has joined the solo 3v3 arena queue.", currentPlayer->GetName().c_str());
+                else
+                    handler->PSendSysMessage("Failed to join queue for player {}.", currentPlayer->GetName().c_str());
             }
         }
 
