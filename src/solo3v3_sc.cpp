@@ -32,6 +32,9 @@ struct SoloMatchContext
 
 static std::unordered_map<uint32, SoloMatchContext> g_soloMatchContexts;
 
+static constexpr uint32 RTG_SCOREBOARD_MENU_ID = 10000;
+static constexpr uint32 RTG_SCOREBOARD_EVENTS_SENDER = 90;
+
 void NpcSolo3v3::Initialize()
 {
     for (int i = 0; i < MAX_TALENT_CAT; i++)
@@ -47,11 +50,17 @@ bool NpcSolo3v3::OnGossipHello(Player* player, Creature* creature)
 
     if (sConfigMgr->GetOption<bool>("Solo.3v3.Enable", true) == false)
     {
-        ChatHandler(player->GetSession()).SendSysMessage("Arena disabled!");
+        ChatHandler(player->GetSession()).SendSysMessage("Solo 3v3 is currently unavailable.");
         return true;
     }
 
     fetchQueueList();
+
+    if (!creature)
+        AddGossipItemFor(player, GOSSIP_ICON_TALK,
+            "|TInterface/PaperDollInfoFrame/UI-GearManager-Undo:30:30:-18:0|t |cff3b2a1aReturn to PvP & Events|r",
+            GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_SCOREBOARD_RETURN);
+
     std::stringstream infoQueue;
 
     infoQueue << " ---------------------------------------------";
@@ -77,7 +86,7 @@ bool NpcSolo3v3::OnGossipHello(Player* player, Creature* creature)
 
 	bool ratedEnabled = sSolo->IsRatedEnabled();
 	if (ratedEnabled && !inSoloQueue && !inNormal3v3)
-		AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_3v3_5:30:30:-18:0|t Queue 3v3soloQ (Rated)", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_RATED);
+		AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "|TInterface/ICONS/Achievement_Arena_3v3_5:30:30:-18:0|t Queue Solo 3v3 (Rated)", GOSSIP_SENDER_MAIN, NPC_3v3_ACTION_JOIN_QUEUE_ARENA_RATED);
 
     // Solo Queue uses a separate ladder table and does NOT require a permanent ArenaTeam.
     // Keep the NPC UI focused on queueing + stats (no create/disband team).
@@ -200,6 +209,17 @@ bool NpcSolo3v3::OnGossipSelect(Player* player, Creature* creature, uint32 /*sen
         {
             OnGossipHello(player, creature);
             return true;
+        }
+
+        case NPC_3v3_ACTION_SCOREBOARD_RETURN:
+        {
+            if (!creature)
+            {
+                CloseGossipMenuFor(player);
+                sPlayerGossipMgr->ShowGossipMenu(player, RTG_SCOREBOARD_MENU_ID, RTG_SCOREBOARD_EVENTS_SENDER, 0);
+                return true;
+            }
+            break;
         }
 
     }
